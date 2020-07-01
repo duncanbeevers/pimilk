@@ -1,41 +1,45 @@
-import butterchurn from 'butterchurn'
-import butterchurnPresets from 'butterchurn-presets'
+import butterchurn from "butterchurn";
+import butterchurnPresets from "butterchurn-presets";
 
-window.AudioContext = window.AudioContext || window.webkitAudioContext
-navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia
+async function start() {
+  const canvas = document.getElementsByTagName("canvas")[0];
+  const audioContext = new window.AudioContext();
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: true,
+    video: false,
+  });
 
-const canvas = document.getElementsByTagName('canvas')[0]
-const select = document.getElementsByTagName('select')[0]
-const button = document.getElementsByTagName('button')[0]
+  const gainNode = new GainNode(audioContext);
+  const microphoneStream = audioContext.createMediaStreamSource(stream);
+  microphoneStream.connect(gainNode);
 
-let visualizer
-
-button.addEventListener('click', async e => {
-  button.style.display = 'none'
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-  const audioContext = new window.AudioContext()
-  const gainNode = audioContext.createGain()
-  gainNode.connect(audioContext.destination)
-  const microphoneStream = audioContext.createMediaStreamSource(stream)
-  microphoneStream.connect(gainNode)
-  visualizer.connectAudio(gainNode)
-  visualizer = butterchurn.createVisualizer(audioContext, canvas, {
+  const size = {
     width: canvas.clientWidth,
-    height: canvas.clientHeight
-  })
-  visualizer.loadPreset(preset, 0.0)
-})
+    height: canvas.clientHeight,
+  };
 
-const presets = butterchurnPresets.getPresets()
-let preset = Object.values(presets)[0]
-select.innerHTML = Object.keys(presets).map(p => `<option>${p}</option>`).join('')
-select.addEventListener('change', e => {
-  preset = presets[select.options[select.selectedIndex].value]
-  if (visualizer) {
-    visualizer.loadPreset(preset, 5.0)
+  const presets = Object.values(butterchurnPresets.getPresets());
+  const preset = presets[Math.floor(Math.random() * presets.length)];
+
+  const visualizer = butterchurn.createVisualizer(audioContext, canvas, size);
+  visualizer.connectAudio(gainNode);
+  visualizer.loadPreset(preset, 0.0);
+
+  window.addEventListener(
+    "resize",
+    () =>
+      visualizer &&
+      visualizer.setRendererSize(canvas.clientWidth, canvas.clientHeight)
+  );
+
+  function scheduleRender() {
+    window.requestAnimationFrame(() => {
+      visualizer && visualizer.render();
+      scheduleRender();
+    });
   }
-})
 
-window.addEventListener('resize', e => visualizer && visualizer.setRendererSize(canvas.clientWidth, canvas.clientHeight))
+  scheduleRender();
+}
 
-window.requestAnimationFrame(() => visualizer && visualizer.render())
+start();
