@@ -1,7 +1,35 @@
 import butterchurn from "butterchurn";
 import butterchurnPresets from "butterchurn-presets";
 
-async function start() {
+function addInteractionEventListeners(node, handler) {
+  node.addEventListener('click', handler);
+}
+
+function removeInteractionEventListeners(node, handler) {
+  node.removeEventListener('click', handler);
+}
+
+async function getUserInput() {
+  return new Promise((resolve, reject) => {
+    const overlayNode = window.DOM_NODE_OVERLAY;
+    if (!overlayNode) {
+      reject();
+      return;
+    }
+
+    function onInteract() {
+      overlayNode.classList.remove('visible');
+      removeInteractionEventListeners(overlayNode, onInteract);
+      resolve();
+    }
+
+    addInteractionEventListeners(overlayNode, onInteract);
+
+    overlayNode.classList.add('visible');
+  });
+}
+
+async function main() {
   const canvas = document.getElementsByTagName("canvas")[0];
   const audioContext = new window.AudioContext();
   const stream = await navigator.mediaDevices.getUserMedia({
@@ -13,33 +41,42 @@ async function start() {
   const microphoneStream = audioContext.createMediaStreamSource(stream);
   microphoneStream.connect(gainNode);
 
-  const size = {
+  const presets = Object.values(butterchurnPresets.getPresets());
+  function getRandomPreset() {
+    return presets[Math.floor(Math.random() * presets.length)];
+  }
+
+  const visualizer = butterchurn.createVisualizer(audioContext, canvas, {
     width: canvas.clientWidth,
     height: canvas.clientHeight,
-  };
+  });
 
-  const presets = Object.values(butterchurnPresets.getPresets());
-  const preset = presets[Math.floor(Math.random() * presets.length)];
-
-  const visualizer = butterchurn.createVisualizer(audioContext, canvas, size);
   visualizer.connectAudio(gainNode);
-  visualizer.loadPreset(preset, 0.0);
+  visualizer.loadPreset(getRandomPreset(), 0.0);
 
   window.addEventListener(
     "resize",
     () =>
-      visualizer &&
       visualizer.setRendererSize(canvas.clientWidth, canvas.clientHeight)
   );
 
-  function scheduleRender() {
-    window.requestAnimationFrame(() => {
-      visualizer && visualizer.render();
-      scheduleRender();
-    });
-  }
+  setInterval(() => {
+    visualizer.loadPreset(getRandomPreset(), 1.0);
+  }, 10000);
 
-  scheduleRender();
+  while (true) {
+    if (audioContext.state === 'running') {
+      await new Promise((resolve, reject) => {
+        window.requestAnimationFrame(() => {
+          visualizer.render();
+          resolve();
+        });
+      })
+    } else {
+      await getUserInput();
+      await audioContext.resume();
+    }
+  }
 }
 
-start();
+main();
