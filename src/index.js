@@ -1,22 +1,18 @@
-function log(message) {
-  const ele = window.document.createElement('div');
-  ele.classList.add('logLine');
-  ele.textContent = message;
-  window.DOM_NODE_LOG.appendChild(ele);
-}
-
-log('importing dependencies');
-
 import butterchurn from "butterchurn";
 import butterchurnPresets from "butterchurn-presets";
 
-log('defining main()');
+function log(message) {
+  const ele = window.document.createElement('pre');
+  ele.classList.add('logLine');
+  ele.textContent = typeof message ==='string' ? message : JSON.stringify(message, null, 2);
+  window.DOM_NODE_LOG.appendChild(ele);
+}
 
 async function main() {
   const canvas = window.DOM_NODE_VIZ_CANVAS;
 
   log('creating audio context');
-  const audioContext = new window.AudioContext();
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
   log('awaiting getUserMedia audio: true')
   const stream = await navigator.mediaDevices.getUserMedia({
@@ -25,7 +21,7 @@ async function main() {
   });
 
   log('creating audio node graph gain node');
-  const gainNode = new GainNode(audioContext);
+  const gainNode = audioContext.createGain();
 
   log('creating microphone stream');
   const microphoneStream = audioContext.createMediaStreamSource(stream);
